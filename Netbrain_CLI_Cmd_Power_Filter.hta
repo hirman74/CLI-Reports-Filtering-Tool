@@ -1,0 +1,353 @@
+<html>
+<head>
+<title>Netbrain CLI Power Supply Filter</title>
+
+<HTA:APPLICATION 
+     ID="NetbrainCLI"
+     APPLICATIONNAME="CLIcreator"
+     SCROLL="yes"
+     SINGLEINSTANCE="yes"
+</head>
+
+<SCRIPT Language="VBScript">
+Public resultName
+
+Sub Window_Onload
+	self.Focus()
+	self.ResizeTo 810,450
+End Sub
+
+Sub ChooseSaveFolder
+	DataArea.InnerHtml = ""
+	'strStartDir = 17
+	strStartDir = 0
+	PickFolder(strStartDir)
+	'Set m = resultNameNow()
+	'resultName = m.name	
+	'netbrainCLIinput.InnerHTML = "Refer to generated file : " & resultName & "<br>"
+End Sub
+
+class filingName
+	public name
+end class 
+
+Function resultNameNow ()
+	dim m
+	set m = new filingName
+	If Len (month(now)) < 2 Then
+		monthly = "0" & (month(now))
+	Else
+		monthly = (month(now))
+	End If
+
+	If Len (day(now)) < 2 Then
+		dayly = "0" & (day(now))
+	Else
+		dayly = (day(now))
+	End If
+
+	If Len (hour(now)) < 2 Then
+		hourly = "0" & (hour(now))
+	Else
+		hourly = (hour(now))
+	End If
+
+	If Len (minute(now)) < 2 Then
+		minutely = "0" & (minute(now))
+	Else
+		minutely = (minute(now))
+	End If
+
+	If Len (second(now)) < 2 Then
+		secondly = "0" & (second(now))
+	Else
+		secondly = (second(now))
+	End If
+	m.name = "Netbrain_Filtered_" & year(now) & monthly & dayly & "_" & hourly & minutely & secondly
+	set resultNameNow = m
+End Function
+
+Function PickFolder(strStartDir)
+	Dim objShell, objFS
+	Set objShell = CreateObject("Shell.Application")
+	Set objFS = objShell.BrowseForFolder(0, "Choose a folder where the Netbrain exported txt file is saved.", 0, strStartDir)
+		If (Not objFS Is Nothing) Then
+			PickFolder = objFS.Items.Item.path
+				If Instr (PickFolder, "::") > 0 Then
+					msgbox ("Please select a folder.")
+					Location.Reload(True)
+					Exit Function
+				End If 
+			ListFiles(PickFolder)
+		ElseIf Len(TypeName(objFS)) > 5 Then
+			Location.Reload(True)
+			Exit Function		
+		End If
+	Set objFS = Nothing
+	Set objShell = Nothing
+End Function
+
+Function ListFiles(objPath)
+	Dim objFolder, objFso, objFile, txtFile
+	txtFile = 0
+	Set objFso = CreateObject("Scripting.FileSystemObject")
+	Set oShell = CreateObject("WScript.Shell")
+	sTemp = oShell.ExpandEnvironmentStrings("%TEMP%")
+	sTempFile = sTemp & "\" & objFso.GetTempName
+	Const ForReading = 1, ForWriting = 2, ForAppending = 8, OpenAsDefault = -2, FailIfNotExist = 0	
+	Set m = resultNameNow()
+	resultName = m.name
+	Set fFile = objFso.OpenTextFile(sTempFile, ForAppending, True, OpenAsDefault)
+
+	Set objFolder = objFso.GetFolder(objPath)
+		For each objFile in objFolder.Files
+			If objFolder.Files.Count > 0 AND  LCase (objFso.GetExtensionName (objFile)) = "txt" Then
+					Set objTextFile = objFso.OpenTextFile (objFile, ForReading, False,-2)
+					Do Until objTextFile.AtEndOfStream
+						strLine = objTextFile.ReadLine
+						strLine = Replace (strLine, ",", " ")
+						fFile.Writeline objFso.GetBaseName(objFile) & "," & """" & strLine & """"							
+					Loop
+					objTextFile.close
+			End If				
+		Next
+	fFile.Close
+	Set objRead = objFso.OpenTextFile(sTempFile, ForReading, False)	
+	StringAllLine = objRead.ReadAll
+	objRead.Close
+	objFso.DeleteFile sTempFile	
+	SplitString = Split (StringAllLine, vbCR & vbLF)	
+	Dim deviceIncluded
+	ReDim deviceIncluded (0)	
+	sTxtarea = INCLUDING.Value
+	stringToFind = Split (sTxtarea,vbCRLF)
+	For n = 0 to Ubound(SplitString)
+		For each toIncluded in stringToFind
+			If Instr (SplitString(n), toIncluded) > 0 Then
+				deviceIncluded (Ubound(deviceIncluded,1)) = SplitString(n)
+				Redim Preserve deviceIncluded (Ubound(deviceIncluded,1) + 1)
+				Exit For
+			End If
+		Next
+	Next	
+	Erase SplitString
+	If Not (Ubound(deviceIncluded) > 0) Then
+		msgbox "No entries to be extracted."
+		Exit Function		
+	End If
+	
+	temperFile = sTemp & "\" & resultName & "_" & objFso.GetBaseName(objPath) & "_BUFFER_INCLUDE.txt"
+	'temperFile = ".\" & resultName & "_" & objFso.GetBaseName(objPath) & "_BUFFER_INCLUDE.txt"
+	If Not(objFso.FileExists (temperFile)) Then
+		Set objBUFFER = objFso.OpenTextFile ( temperFile, ForWriting,true)
+			For n = 0 to Ubound(deviceIncluded) - 1
+					objBUFFER.writeline deviceIncluded(n)
+			Next
+		objBUFFER.close
+		Erase deviceIncluded
+	End If
+	
+	Dim deviceExcluded
+	ReDim deviceExcluded (0)		
+	sTxtarea = EXCLUDING.Value
+	stringToFind = Split (sTxtarea,vbCRLF)
+	If Len(sTxtarea) <> 0 Then
+		For each excludedDesc in stringToFind
+			If Len (excludedDesc) > 0 Then
+				If objFso.FileExists (temperFile) Then
+					Set objBUFFER = objFso.OpenTextFile ( temperFile, ForReading,false)
+					StringAllLine = objBUFFER.ReadAll
+					objBUFFER.close
+					objFso.DeleteFile (temperFile)
+						If Len(StringAllLine) > 0 Then
+							SplitString = Split (StringAllLine, vbCR & vbLF)
+							Set objBUFFER = objFso.OpenTextFile ( temperFile, ForWriting,true)
+								For n = 0 to Ubound(SplitString)
+									If Instr (SplitString(n), excludedDesc) = 0 Then								
+										objBUFFER.writeline SplitString(n)
+									End If
+								Next
+							objBUFFER.close
+						Else
+							msgbox "No entries to be extracted."
+							objFso.DeleteFile (temperFile)
+							Exit Function						
+						End If
+				Else
+					msgbox "No entries to be extracted."
+					Exit Function					
+				End If
+			End If
+		Next
+		If objFso.FileExists (temperFile) Then
+			Set objBUFFER = objFso.OpenTextFile ( temperFile, ForReading,false)
+			StringAllLine = objBUFFER.ReadAll
+			objBUFFER.close
+			objFso.DeleteFile (temperFile)
+			If Len(StringAllLine) > 0 Then
+				SplitString = Split (StringAllLine, vbCR & vbLF)
+				For each lining in SplitString
+					If Len(lining) > 0 Then
+						Redim Preserve deviceExcluded (Ubound (deviceExcluded) + 1 )
+						deviceExcluded(Ubound (deviceExcluded) ) = lining
+					End If
+				Next
+			End If
+		Else
+			msgbox "No entries to be extracted."
+			Exit Function		
+		End If
+
+	ElseIf Len(sTxtarea) = 0 Then
+		Redim deviceExcluded (Ubound(deviceIncluded,1) - 1 )
+		For n = 0 to Ubound(deviceExcluded)
+			deviceExcluded(n) = deviceIncluded (n)
+		Next
+		Erase deviceIncluded
+	End If
+
+	Dim uniqueDevices
+	Redim uniqueDevices (0)
+	For n = 0 to Ubound (deviceExcluded)
+		If Len(deviceExcluded(n)) > 0 Then
+			deviceName = Split(deviceExcluded(n), ",")
+			If Len(deviceName(0)) > 0 Then
+				If uniqueDevices(Ubound(uniqueDevices)) <> deviceName(0) Then
+					Redim Preserve uniqueDevices(Ubound(uniqueDevices) + 1)
+					uniqueDevices(Ubound(uniqueDevices)) = deviceName(0)
+				End If
+			End If
+		End If
+	Next
+	
+	Dim mergeDevices
+	Redim mergeDevices(Ubound(uniqueDevices))
+	m = 0
+	For each deviceName in uniqueDevices
+		For n = 0 to Ubound (deviceExcluded,1)
+			If Len(deviceExcluded(n)) > 0 AND Len(deviceName) > 0 AND Instr(deviceExcluded(n),",") > 0 Then
+				nameSplit = Split(deviceExcluded(n),",")
+				If Instr(nameSplit(0) , deviceName) > 0 Then
+					Do Until Instr(deviceExcluded(n) , deviceName) = 0
+						If Len(mergeDevices(m)) > 0 Then
+							divideSplit = Split (deviceExcluded(n) ,",")
+							divideSplitName = Split (mergeDevices(m) ,",")
+							If Len(divideSplit(0)) = Len (divideSplitName(0)) Then
+								mergeDevices(m) = mergeDevices(m) & "," & divideSplit(1)
+							End If
+						ElseIf Len(mergeDevices(m)) = 0 Then
+							mergeDevices(m) = deviceExcluded(n)
+						End If
+						n = n + 1
+						If n > Ubound (deviceExcluded) Then
+							Exit Do
+						End If
+					Loop
+				End If
+			End If
+
+		Next
+		m = m + 1
+	Next
+	
+	Set objwrite = objFso.OpenTextFile ( sTemp & "\" & resultName & "_" & objFso.GetBaseName(objPath) & ".csv", ForAppending,true)	
+		objwrite.write "Device Name,Power 1,Power 2,Power 3,Power 4,Power 5,Power 6,"
+		objwrite.writeline ""
+	For n = 0 to Ubound (mergeDevices)
+		objwrite.writeline mergeDevices(n)
+	Next
+	objwrite.close
+	
+	DataArea.InnerHtml = "Refer to generated file : <a href=" & Chr(34) & "file:./" &  resultName & "_" & objFso.GetBaseName(objPath) & ".csv" & Chr(34)  & ">" &  resultName & "_" & objFso.GetBaseName(objPath) & ".csv" & "</a>"
+	objFSO.MoveFile sTemp & "\" & resultName & "_" & objFso.GetBaseName(objPath) & ".csv",  ".\" & resultName & "_" & objFso.GetBaseName(objPath) & ".csv"	
+	Set objFolder = Nothing
+	Set objFso = Nothing
+	Set objFile = Nothing
+	Set txtFile = Nothing
+End Function
+
+Sub SubRun
+	Const ForReading = 1
+	Const ForWriting = 2
+	Const ForAppending = 8
+	Dim counter,x,y,v
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	DeviceListList = DeviceList.Value
+	arrLines1 = Split (DeviceListList,vbCrLf)
+	CommandListList = CommandList.Value
+	arrLines2 = Split (CommandListList,vbCrLf)
+	strHTML = strHTML & "&lt;ExecuteShowCommands RerunFailedOnly=" &  """" & "0"  & """" & "&gt;" & "<br>"
+	strHTML = strHTML & "&lt;SharedCommands&gt;"& "<br>"
+	For Each strLine in arrLines2
+		'If Instr (1,strLine,"show",1) > 0 Then
+		If Len(strLine) > 0 Then
+		strHTML = strHTML & "&lt;Command Frequence=" & """" & "1" & """" & " Time=" & """" & "0" & """" & " Repeat=" & """" & "0" & """" & "&gt;" & strLine & "&lt;/Command&gt;" & "<br>"
+		End If
+	Next
+	strHTML = strHTML & "&lt;/SharedCommands&gt;" & "<br>" 
+	strHTML = strHTML & "&lt;AllDevices&gt;" & "<br>"
+	For Each strLine in arrLines1
+		If Len(strLine) > 0 Then
+		strHTML = strHTML & "&lt;Device DeviceName=" & """" & strLine & """" & " Type=" & """" & "1" & """" & "/&gt;" & "<br>"
+		End If
+	Next
+	strHTML = strHTML & "&lt;/AllDevices&gt;" & "<br>"
+	strHTML = strHTML & "&lt;/ExecuteShowCommands&gt;" & "<br>"
+
+	netbrainCLIinput.InnerHTML = strHTML
+End Sub
+
+Sub RunReload
+    Location.Reload(True)
+End Sub
+
+Function LogOff()
+	window.close
+End Function
+
+</SCRIPT>
+
+<body>
+<u>Netbrain CLI command, 2 or more power supply check</u> <br><br>
+
+<input type = "button" value = "Browse Folder" style="width:100px;height:25px" onClick="ChooseSaveFolder" title="Select folder where Netbrain Text output is kept"> 
+<input type="button" style="width:100px;height:25px" value="Quit" onClick="Logoff()" title="Close this window.">
+<input type="button" style="width:100px;height:25px" value="Reset" onClick="RunReload()" title="Reset this window.">
+<br><br>
+Browse to the folder of Netbrain exported text file to merge into a single CSV file. <br>
+<Span Id = "DataArea"></Span><br>
+<hr></hr>
+INCLUDE string<br>
+<TEXTAREA style="Height:100;Width:700;font-Size:12;font-weight:normal;TITLE=""; NAME="INCLUDING"; WRAP=hard>
+Internal Power Supply
+Main Power Supply is AC
+Redundant Power System
+Not Present
+Good     Good
+Internal POWER supply
+POWER is OK
+power supply
+Power Supply 2:
+is NOT PRESENT
+RPS is NOT present
+RPS is NOT PRESENT
+power supply 1 
+power supply 2 
+Power Supply 1
+Power Supply 2
+Power Supply 1 is
+Power Supply 2 is
+<>              <>
+Built-in                                         Good
+OK              Good
+Fixed                                            Good</TEXTAREA>
+<br>
+<br>
+EXCLUDE string<br>
+<TEXTAREA style="Height:100;Width:700;font-Size:12;font-weight:normal;TITLE=""; NAME="EXCLUDING"; WRAP=hard>
+FAN 
+Not Present     <>
+</TEXTAREA>
+
+</body>
+</html>
